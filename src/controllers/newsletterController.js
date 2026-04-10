@@ -1,6 +1,8 @@
 import Newsletter from '../models/Newsletter.js';
 import pkg from 'nodemailer';
 const { createTransport } = pkg;
+import { sendEmail } from '../config/emailService.js';
+import { generateWelcomeEmail, generateWelcomeEmailText } from '../templates/welcomeEmail.js';
 
 export const subscribe = async (req, res) => {
   try {
@@ -23,6 +25,19 @@ export const subscribe = async (req, res) => {
 
     const subscriber = new Newsletter({ email });
     await subscriber.save();
+
+    // Send welcome email to new subscriber (non-blocking)
+    try {
+      await sendEmail(
+        email,
+        '🎉 Welcome to UpDownLive Newsletter!',
+        generateWelcomeEmailText(email),
+        generateWelcomeEmail(email)
+      );
+    } catch (emailError) {
+      console.error('Failed to send newsletter welcome email:', emailError);
+    }
+
     res.status(201).json({ message: 'Successfully subscribed to newsletter' });
   } catch (error) {
     console.error('Newsletter subscription error:', error);

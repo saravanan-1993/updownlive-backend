@@ -49,9 +49,26 @@ const allowedOrigins = [
   process.env.FRONTEND_URL || 'http://localhost:3000',
   'http://localhost:3000',
   'http://localhost:5173',
+  'https://updownlive.com',
+  'https://www.updownlive.com',
   'https://updownlive.vercel.app',
   'https://updownlive-4778.vercel.app',
 ];
+
+// Handle preflight requests explicitly
+app.options('*', cors({
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    if (/\.vercel\.app$/.test(origin)) return callback(null, true);
+    callback(null, true); // Allow all origins for OPTIONS
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'X-Requested-With'],
+  exposedHeaders: ['Set-Cookie'],
+  optionsSuccessStatus: 204,
+}));
 
 app.use(cors({
   origin: function (origin, callback) {
