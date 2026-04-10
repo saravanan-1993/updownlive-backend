@@ -179,5 +179,61 @@ router.post('/seo', async (req, res) => {
   }
 });
 
+// GET terms and conditions content
+router.get('/legal/terms', async (req, res) => {
+  try {
+    const db = await getDb();
+    const settings = await db.collection('settings').findOne({ key: 'termsContent' });
+    res.json({ content: settings?.value || '' });
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching terms content' });
+  }
+});
+
+// POST to update terms and conditions content
+router.post('/legal/terms', async (req, res) => {
+  try {
+    const { content } = req.body;
+    if (content === undefined) return res.status(400).json({ error: 'Content is required' });
+    const db = await getDb();
+    await db.collection('settings').updateOne(
+      { key: 'termsContent' },
+      { $set: { value: content, updatedAt: new Date() } },
+      { upsert: true }
+    );
+    res.json({ success: true, message: 'Terms content updated successfully' });
+  } catch (error) {
+    res.status(500).json({ error: 'Error updating terms content' });
+  }
+});
+
+// GET privacy notice content
+router.get('/legal/privacy', async (req, res) => {
+  try {
+    const db = await getDb();
+    const settings = await db.collection('settings').findOne({ key: 'privacyContent' });
+    res.json({ content: settings?.value || '' });
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching privacy content' });
+  }
+});
+
+// POST to update privacy notice content
+router.post('/legal/privacy', async (req, res) => {
+  try {
+    const { content } = req.body;
+    if (content === undefined) return res.status(400).json({ error: 'Content is required' });
+    const db = await getDb();
+    await db.collection('settings').updateOne(
+      { key: 'privacyContent' },
+      { $set: { value: content, updatedAt: new Date() } },
+      { upsert: true }
+    );
+    res.json({ success: true, message: 'Privacy content updated successfully' });
+  } catch (error) {
+    res.status(500).json({ error: 'Error updating privacy content' });
+  }
+});
+
 export default router;
 

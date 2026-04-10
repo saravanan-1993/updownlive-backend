@@ -125,50 +125,66 @@ export const sendBulkEmail = async (req, res) => {
         </div>`
       : '';
 
-    const emailPromises = subscribers.map(subscriber => {
-      const mailOptions = {
-        from: `"UpDownLive" <${process.env.SMTP_USER}>`,
-        to: subscriber.email,
-        subject,
-        html: `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <meta charset="utf-8" />
-            <style>
-              body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background: #f3f4f6; }
-              .container { max-width: 600px; margin: 32px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
-              .header { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; padding: 32px 30px; text-align: center; }
-              .header h1 { margin: 0; font-size: 26px; font-weight: 700; }
-              .content { padding: 32px 30px; }
-              .message { white-space: pre-wrap; font-size: 15px; color: #374151; line-height: 1.8; }
-              .footer { background: #f9fafb; border-top: 1px solid #e5e7eb; padding: 20px 30px; text-align: center; font-size: 12px; color: #6b7280; }
-              .unsubscribe { color: #3b82f6; text-decoration: none; }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <div class="header">
-                <h1>${title}</h1>
-              </div>
-              <div class="content">
-                ${imagesHtml}
-                <p class="message">${message}</p>
-              </div>
-              <div class="footer">
-                <p>You're receiving this because you subscribed to UpDownLive newsletter.</p>
-                <p><a href="${process.env.FRONTEND_URL}/unsubscribe/${subscriber._id}" class="unsubscribe">Unsubscribe</a></p>
-              </div>
+    let sentCount = 0;
+    let failedCount = 0;
+    const BATCH_SIZE = 5;
+
+    const buildMailOptions = (subscriber) => ({
+      from: `"UpDownLive" <${process.env.SMTP_USER}>`,
+      to: subscriber.email,
+      subject,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8" />
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background: #f3f4f6; }
+            .container { max-width: 600px; margin: 32px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
+            .header { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; padding: 32px 30px; text-align: center; }
+            .header h1 { margin: 0; font-size: 26px; font-weight: 700; }
+            .content { padding: 32px 30px; }
+            .message { font-size: 15px; color: #374151; line-height: 1.8; }
+            .footer { background: #f9fafb; border-top: 1px solid #e5e7eb; padding: 20px 30px; text-align: center; font-size: 12px; color: #6b7280; }
+            .unsubscribe { color: #3b82f6; text-decoration: none; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>${title}</h1>
             </div>
-          </body>
-          </html>
-        `
-      };
-      return transporter.sendMail(mailOptions);
+            <div class="content">
+              ${imagesHtml}
+              <div class="message">${message}</div>
+            </div>
+            <div class="footer">
+              <p>You're receiving this because you subscribed to UpDownLive newsletter.</p>
+              <p><a href="${process.env.FRONTEND_URL}/unsubscribe/${subscriber._id}" class="unsubscribe">Unsubscribe</a></p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `
     });
 
-    await Promise.all(emailPromises);
-    res.status(200).json({ message: `Email sent successfully to ${subscribers.length} subscribers` });
+    // Send in batches of 5 with a short delay between batches
+    for (let i = 0; i < subscribers.length; i += BATCH_SIZE) {
+      const batch = subscribers.slice(i, i + BATCH_SIZE);
+      const results = await Promise.allSettled(
+        batch.map(sub => transporter.sendMail(buildMailOptions(sub)))
+      );
+      results.forEach((r, idx) => {
+        if (r.status === 'fulfilled') sentCount++;
+        else { failedCount++; console.error(`Failed to send to ${batch[idx].email}:`, r.reason?.message); }
+      });
+      // Short delay between batches
+      if (i + BATCH_SIZE < subscribers.length) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
+
+    res.status(200).json({ message: `Email sent to ${sentCount} subscribers${failedCount > 0 ? `, ${failedCount} failed` : ''}` });
   } catch (error) {
     console.error('Send bulk email error:', error);
     res.status(500).json({ message: 'Failed to send emails', error: error.message });
