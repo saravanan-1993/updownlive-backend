@@ -28,12 +28,12 @@ export const subscribe = async (req, res) => {
 
     // Send welcome email to new subscriber (non-blocking)
     try {
-      await sendEmail(
-        email,
-        '🎉 Welcome to UpDownLive Newsletter!',
-        generateWelcomeEmailText(email),
-        generateWelcomeEmail(email)
-      );
+      await sendEmail({
+        to: email,
+        subject: '🎉 Welcome to UpDownLive Newsletter!',
+        text: generateWelcomeEmailText(email),
+        html: generateWelcomeEmail(email),
+      });
     } catch (emailError) {
       console.error('Failed to send newsletter welcome email:', emailError);
     }
